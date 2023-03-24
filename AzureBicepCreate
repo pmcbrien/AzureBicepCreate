@@ -1,0 +1,86 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "storageAccountName": {
+            "type": "string",
+            "metadata": {
+                "description": "The name of the storage account to create."
+            }
+        },
+        "storageAccountSku": {
+            "type": "string",
+            "defaultValue": "Standard_LRS",
+            "allowedValues": [
+                "Standard_LRS",
+                "Standard_GRS",
+                "Standard_RAGRS",
+                "Standard_ZRS",
+                "Premium_LRS"
+            ],
+            "metadata": {
+                "description": "The SKU of the storage account."
+            }
+        },
+        "containerName": {
+            "type": "string",
+            "metadata": {
+                "description": "The name of the storage container to create."
+            }
+        }
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "2022-02-01",
+            "name": "[parameters('storageAccountName')]",
+            "location": "[resourceGroup().location]",
+            "sku": {
+                "name": "[parameters('storageAccountSku')]"
+            },
+            "kind": "StorageV2",
+            "properties": {
+                "supportsHttpsTrafficOnly": true
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+            "apiVersion": "2022-02-01",
+            "name": "[concat(parameters('storageAccountName'), '/default/', parameters('containerName'))]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]"
+            ],
+            "properties": {
+                "publicAccess": "None"
+            }
+        },
+        {
+            "type": "Microsoft.Authorization/servicePrincipals",
+            "apiVersion": "2022-02-01",
+            "name": "[concat('http://', parameters('storageAccountName'), '/', parameters('containerName'))]",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "applicationId": "[reference(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName')), '2022-02-01', 'Full').identity.principalId]"
+            }
+        }
+    ],
+    "outputs": {
+        "storageAccountName": {
+            "type": "string",
+            "value": "[parameters('storageAccountName')]"
+        },
+        "storageAccountKey": {
+            "type": "securestring",
+            "value": "[listKeys(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName')), '2022-02-01').keys[0].value]"
+        },
+        "containerName": {
+            "type": "string",
+            "value": "[parameters('containerName')]"
+        },
+        "servicePrincipalId": {
+            "type": "string",
+            "value": "[reference(resourceId('Microsoft.Authorization/servicePrincipals', concat('http://', parameters('storageAccountName'), '/', parameters('containerName'))), '2022-02-01').appId]"
+        },
+        "servicePrincipalSecret": {
+            "type": "securestring",
+            "value": "[reference(resourceId('Microsoft.Authorization/servicePrincipals', concat('http://', parameters('storageAccountName'), '/', parameters('containerName'))), '2022-02-01').password
